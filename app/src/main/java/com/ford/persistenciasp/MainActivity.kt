@@ -13,6 +13,8 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import android.view.Menu
 import android.view.MenuItem
 import androidx.fragment.app.Fragment
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.ford.persistenciasp.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -22,8 +24,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var navHostFragment: Fragment
 
-    private lateinit var sp: SharedPreferences
-    private lateinit var spEditor: SharedPreferences.Editor
+    private lateinit var encryptedSp: SharedPreferences
+    private lateinit var encryptedSpEditor: SharedPreferences.Editor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,15 +42,28 @@ class MainActivity : AppCompatActivity() {
         navHostFragment =
             supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as Fragment
 
-        // Inicializamos SharedPreferences y su editor
-        sp = getPreferences(Context.MODE_PRIVATE)
-        spEditor = sp.edit()
+        // Inicializar MasterKey para encriptación
+        val masterKey = MasterKey.Builder(
+            this,
+            MasterKey.DEFAULT_MASTER_KEY_ALIAS
+        ).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
 
-        // Guardar el nombre de usuario en SharedPreferences
-        spEditor.putString("username", "Carlos").apply()
+        // Inicializar EncryptedSharedPreferences
+        encryptedSp = EncryptedSharedPreferences.create(
+            this,
+            "encrypted_settings",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+
+        encryptedSpEditor = encryptedSp.edit()
+
+        // Guardar el nombre de usuario en EncryptedSharedPreferences
+        encryptedSpEditor.putString("username", "Carlos").apply()
 
         // Verificar si el nombre fue almacenado correctamente
-        val storedUsername = sp.getString("username", "")
+        val storedUsername = encryptedSp.getString("username", "")
         if (storedUsername == "Carlos") {
             // Mostrar un Toast de confirmación al iniciar la app
             showToast(storedUsername)
@@ -57,8 +72,8 @@ class MainActivity : AppCompatActivity() {
             showToast("Error al almacenar el nombre")
         }
 
-        // Cargamos el color guardado
-        val color = sp.getInt("color", R.color.white)
+        // Cargar el color guardado
+        val color = encryptedSp.getInt("color", R.color.white)
         changeColor(color)
 
         binding.fab.setOnClickListener { view ->
@@ -152,8 +167,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveColor(color: Int) {
-        // Guardar el color seleccionado en SharedPreferences
-        spEditor.putInt("color", color).apply()
+        // Guardar el color seleccionado en EncryptedSharedPreferences
+        encryptedSpEditor.putInt("color", color).apply()
+    }
+
+    private fun saveEncryptedCredentials(user: String, password: String){
+        encryptedSpEditor.putString("user", user).apply()
+        encryptedSpEditor.putString("password", password).apply()
     }
 
     private fun showToast(message: String) {
